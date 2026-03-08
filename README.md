@@ -11,14 +11,21 @@
 ### 后端
 - Node.js + Express
 - CORS 支持
+- 本地文件系统读取
 
 ### 前端
 - Vue 3 + TypeScript
-- Vite
-- Element Plus
-- Axios
+- Vite (构建工具)
+- Element Plus (UI 组件库)
+- Axios (HTTP 客户端)
 - Marked (Markdown 渲染)
 - Highlight.js (代码高亮)
+- Vue DevTools (开发调试)
+
+### 开发工具
+- concurrently (并行运行脚本)
+- npm-run-all2 (构建流程管理)
+- vue-tsc (TypeScript 类型检查)
 
 ## 快速开始
 
@@ -28,7 +35,7 @@
 # macOS / Linux
 ./start.sh
 
-# 或使用 npm
+# 或使用 npm（会自动安装依赖）
 npm run start
 ```
 
@@ -52,23 +59,32 @@ npm run start:client
 ### 可用命令
 
 ```bash
-npm run start          # 安装依赖并一键启动
+npm run start           # 安装依赖并一键启动
 npm run start:dev       # 启动前后端（不安装依赖）
-npm run start:server    # 仅启动后端
-npm run start:client    # 仅启动前端
-npm run install:all     # 安装前后端依赖
+npm run start:server     # 仅启动后端
+npm run start:client     # 仅启动前端
+npm run install:all      # 安装前后端依赖
 npm run install:server  # 仅安装后端依赖
 npm run install:client  # 仅安装前端依赖
+npm run build:client    # 构建前端项目
 ```
 
 ## 功能特性
 
+### 核心功能
 - 📁 **项目管理**: 浏览所有使用 Claude Code 的项目
 - 💬 **会话历史**: 查看每个项目的所有会话记录
 - 📝 **对话详情**: 类似微信聊天界面的对话流展示
 - 🎨 **Markdown 渲染**: 完整支持 Markdown 格式，包括代码高亮
 - 🔧 **工具调用**: 可折叠查看 Claude 在后台执行的系统命令和工具调用
 - 🌙 **深色风格**: 简洁高效的后台管理系统 UI
+
+### 统计分析
+- 📊 **活动统计**: 可视化展示 Claude 使用活跃度
+- 📈 **趋势图表**: 追踪会话数量和使用趋势
+- 🥧 **项目分布**: 饼图展示各项目使用占比
+- 📅 **贡献图**: GitHub 风格的日历热力图展示活动记录
+- 🕐 **最近会话**: 快速查看最近的对话记录
 
 ## API 接口
 
@@ -93,36 +109,61 @@ GET /api/session-detail?filePath=<会话文件路径>
 claude-history-manager/
 ├── server/                    # 后端服务
 │   ├── index.js              # 主服务文件
-│   └── package.json
+│   ├── package.json
+│   └── node_modules/
 ├── client/                    # 前端应用
 │   ├── src/
-│   │   ├── main.ts
-│   │   ├── App.vue
-│   │   └── components/
-│   │       └── MarkdownRenderer.vue
-│   └── package.json
-├── PROJECT_PLAN.md           # 项目规划文档
-├── PROGRESS.md              # 开发进度文档
-└── README.md                # 本文档
+│   │   ├── main.ts            # 入口文件
+│   │   ├── App.vue           # 主应用组件
+│   │   ├── env.d.ts
+│   │   ├── assets/            # 静态资源
+│   │   └── components/        # 组件目录
+│   │       ├── ActivityStats.vue      # 活动统计组件
+│   │       ├── ContributionGraph.vue  # 贡献图组件
+│   │       ├── MarkdownRenderer.vue   # Markdown 渲染组件
+│   │       ├── ProjectPieChart.vue    # 项目分布饼图
+│   │       ├── RecentSessions.vue     # 最近会话组件
+│   │       └── TrendChart.vue         # 趋势图表组件
+│   ├── package.json
+│   └── vite.config.ts
+├── .gitignore                # Git 忽略配置
+├── package.json              # 项目配置
+├── start.sh                  # 一键启动脚本
+└── README.md                 # 本文档
 ```
 
 ## 使用说明
 
+### 基础操作
 1. **选择项目**: 在左侧项目列表中点击要查看的项目
 2. **查看会话**: 项目选中后，下方会显示该项目的所有会话
 3. **阅读对话**: 点击会话即可查看完整的对话历史
 4. **工具调用**: 如果 Claude 执行了系统命令或工具调用，会在消息下方显示可折叠的工具调用信息
 
+### 统计分析
+5. **活动统计**: 查看整体使用活跃度数据
+6. **趋势分析**: 追踪会话数量变化趋势
+7. **项目分布**: 了解各项目的使用占比
+8. **贡献热力图**: 通过日历视图查看每日活动记录
+
 ## 开发说明
 
-本项目使用 Claude Code + GLM 4.7 AI 编码助手开发，采用"分步提示词策略"分四个阶段完成：
+本项目使用 Claude Code + GLM 4.7 AI 编码助手开发，采用"分步提示词策略"完成：
 
-1. **阶段一**: 搭建项目骨架与后端基础 API
-2. **阶段二**: 攻克核心难点——解析底层对话数据
-3. **阶段三**: 初始化前端与核心 UI 布局
-4. **阶段四**: 前后端联调与细节打磨
+1. **阶段一**: 搭建项目骨架与后端基础 API ✅
+2. **阶段二**: 攻克核心难点——解析底层对话数据 ✅
+3. **阶段三**: 初始化前端与核心 UI 布局 ✅
+4. **阶段四**: 前后端联调与细节打磨 ✅
+5. **阶段五**: 统计图表功能扩展 ✅
 
-详细的开发进度请参阅 [PROGRESS.md](PROGRESS.md)。
+### Node.js 版本要求
+项目要求 Node.js 版本为 **^20.19.0 || >=22.12.0**
+
+### 依赖管理
+项目采用前后端分离的依赖管理方式：
+- 根目录 `package.json`: 管理项目级别的脚本和开发工具
+- `server/package.json`: 后端服务依赖
+- `client/package.json`: 前端应用依赖
 
 ## 许可证
 
