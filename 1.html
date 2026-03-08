@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Claude History Manager</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    display: flex; height: 100vh;
+    background: #0d1117;
+    font-family: 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+    color: #c9d1d9; overflow: hidden; font-size: 13px;
+  }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1c2333; border-radius: 2px; }
+
+  /* ── 图标栏 ── */
+  #nav-bar {
+    width: 50px; background: #090c12;
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: 12px; border-right: 1px solid #1c2333;
+    flex-shrink: 0; gap: 2px;
+  }
+  .logo {
+    width: 30px; height: 30px; border-radius: 8px; margin-bottom: 20px;
+    background: linear-gradient(135deg,#f97316,#ef4444);
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .nav-btn {
+    width: 34px; height: 34px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+    color: #4b5563; background: transparent;
+    border: none; outline: none; box-shadow: none;
+  }
+  .nav-btn:hover { color: #9ca3af; background: #0f1520; }
+  .nav-btn.active { color: #93c5fd; background: #162032; box-shadow: inset 2px 0 0 #3b82f6; }
+
+  /* ── 项目列表 ── */
+  #project-panel {
+    width: 155px; background: #0d1117;
+    border-right: 1px solid #1c2333;
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+
+  /* ── 会话列表 ── */
+  #conv-panel {
+    width: 195px; background: #0b0f18;
+    border-right: 1px solid #1c2333;
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+
+  .panel-title {
+    padding: 14px 12px 8px;
+    font-size: 10px; font-weight: 700;
+    color: #3d4f63; letter-spacing: 0.1em; text-transform: uppercase;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0;
+  }
+  .badge {
+    background: #1c2333; color: #4b5563;
+    font-size: 10px; padding: 1px 6px; border-radius: 10px;
+  }
+  .panel-list { flex: 1; overflow-y: auto; }
+
+  /* 项目行 */
+  .project-item {
+    padding: 7px 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    color: #6b7280; border-left: 2px solid transparent;
+    transition: all 0.12s; white-space: nowrap;
+    overflow: hidden;
+  }
+  .project-item:hover { color: #9ca3af; background: #0f1520; }
+  .project-item.active { color: #e2e8f0; background: #13192a; border-left-color: #3b82f6; font-weight: 500; }
+  .project-name { overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
+  .chevron { flex-shrink: 0; opacity: 0.5; }
+
+  /* 会话行 */
+  .conv-item {
+    padding: 9px 12px; cursor: pointer; transition: all 0.12s;
+    border-left: 2px solid transparent;
+  }
+  .conv-item:hover { background: #0f1520; }
+  .conv-item.active { background: #13192a; border-left-color: #3b82f6; }
+  .conv-title { font-size: 12.5px; color: #9ca3af; margin-bottom: 4px; }
+  .conv-item.active .conv-title { color: #e2e8f0; font-weight: 500; }
+  .conv-meta { display: flex; align-items: center; gap: 5px; }
+  .conv-hash {
+    font-family: monospace; font-size: 9.5px;
+    background: #1c2333; color: #4b5563;
+    padding: 1px 5px; border-radius: 3px;
+  }
+  .conv-time { font-size: 10.5px; color: #374151; }
+
+  /* ── 主内容区 ── */
+  #main {
+    flex: 1; display: flex; flex-direction: column;
+    overflow: hidden; min-width: 0;
+  }
+  #topbar {
+    height: 44px; border-bottom: 1px solid #1c2333;
+    display: flex; align-items: center; padding: 0 20px; gap: 8px;
+    background: #0d1117; flex-shrink: 0;
+  }
+  #topbar-project { font-size: 13.5px; font-weight: 600; color: #e2e8f0; }
+  #topbar-sep { color: #2d3748; }
+  #topbar-conv {
+    background: #1c2333; color: #6b7280;
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 4px; font-family: monospace;
+  }
+  #messages { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  /* 消息 */
+  .msg { display: flex; gap: 10px; margin-bottom: 20px; }
+  .msg-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    flex-shrink: 0; margin-top: 9px;
+  }
+  .dot-user { background: #3b82f6; }
+  .dot-claude { background: #10b981; }
+  .msg-body { flex: 1; min-width: 0; }
+  .msg-header { display: flex; align-items: baseline; gap: 7px; margin-bottom: 6px; }
+  .msg-author { font-size: 12.5px; font-weight: 600; }
+  .author-user { color: #60a5fa; }
+  .author-claude { color: #34d399; }
+  .msg-index { font-size: 11px; color: #2d3748; }
+  .msg-text {
+    font-size: 13.5px; color: #c9d1d9; line-height: 1.7;
+  }
+  .msg-text.user-bubble {
+    background: #0e1828; padding: 10px 14px;
+    border-radius: 8px; border-left: 2px solid #1e3a5f;
+  }
+  .tool-call {
+    background: #0d1117; border: 1px solid #1c2333;
+    border-radius: 7px; padding: 8px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .tool-left { display: flex; align-items: center; gap: 6px; color: #4b5563; font-size: 12px; }
+  .tool-name { color: #2d3748; font-family: monospace; font-size: 11px; }
+  .tool-badge {
+    background: #1c2333; color: #4b5563; font-size: 10px;
+    width: 18px; height: 18px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .empty-hint { color: #374151; font-size: 13px; text-align: center; margin-top: 60px; }
+</style>
+</head>
+<body>
+
+<!-- 图标导航栏 -->
+<div id="nav-bar">
+  <div class="logo">🤖</div>
+  <button class="nav-btn" data-nav="dashboard" title="仪表盘">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+    </svg>
+  </button>
+  <button class="nav-btn active" data-nav="projects" title="项目浏览">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+    </svg>
+  </button>
+  <button class="nav-btn" data-nav="search" title="全局搜索">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>
+    </svg>
+  </button>
+</div>
+
+<!-- 项目列表 -->
+<div id="project-panel">
+  <div class="panel-title">项目列表</div>
+  <div class="panel-list" id="project-list"></div>
+</div>
+
+<!-- 会话列表 -->
+<div id="conv-panel">
+  <div class="panel-title">
+    <span>会话列表</span>
+    <span class="badge" id="conv-count">0</span>
+  </div>
+  <div class="panel-list" id="conv-list"></div>
+</div>
+
+<!-- 主内容区 -->
+<div id="main">
+  <div id="topbar">
+    <span id="topbar-project">—</span>
+    <span id="topbar-sep" style="display:none">/</span>
+    <span id="topbar-conv" style="display:none"></span>
+  </div>
+  <div id="messages"></div>
+</div>
+
+<script>
+const PROJECTS = [
+  "dongdong","claude-code-practice","国家大剧院招募活动",
+  "自己拍摄的照片","音频轨道-字幕-动作案例","理财产品收益观测","claude-history-manager"
+];
+
+const CONVERSATIONS = {
+  "claude-history-manager": [
+    { id:"34d52af3", title:"创建 ide",   time:"3月8日 19:07" },
+    { id:"b8ba7573", title:"ide",         time:"3月8日 19:06" },
+    { id:"cd168bd7", title:"更新 ide",   time:"3月8日 19:02" },
+    { id:"3e3f99dd", title:"3e3f99dd",   time:"3月8日 18:44" },
+    { id:"3fb81faa", title:"3fb81faa",   time:"3月8日 18:30" },
+  ],
+  "dongdong": [
+    { id:"aabb1122", title:"项目初始化", time:"3月7日 10:00" },
+    { id:"ccdd3344", title:"功能讨论",   time:"3月7日 11:30" },
+  ],
+  "claude-code-practice": [
+    { id:"eeff5566", title:"练习一",     time:"3月6日 09:00" },
+  ],
+};
+
+const MESSAGES = [
+  { role:"user",   index:1, content:"把前端和后端封装下 整理成一键启动" },
+  { role:"claude", index:2, content:"我来帮你把前端和后端整理成一键启动。首先让我查看项目结构。" },
+  { role:"claude", index:3, tool:true, toolName:"read_file" },
+  { role:"claude", index:4, tool:true, toolName:"list_directory" },
+  { role:"claude", index:5, content:"让我查看前端和后端的完整结构以及依赖配置：" },
+  { role:"claude", index:6, tool:true, toolName:"read_file" },
+  { role:"claude", index:7, content:"已完成项目结构分析，正在生成启动脚本..." },
+];
+
+let activeProject = "claude-history-manager";
+let activeConv    = "34d52af3";
+
+/* ── 渲染项目列表 ── */
+function renderProjects() {
+  const el = document.getElementById("project-list");
+  el.innerHTML = PROJECTS.map(p => `
+    <div class="project-item ${p === activeProject ? 'active' : ''}" data-project="${p}">
+      <span class="project-name">${p}</span>
+      ${p === activeProject ? `<svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>` : ''}
+    </div>
+  `).join('');
+  el.querySelectorAll('.project-item').forEach(el => {
+    el.addEventListener('click', () => {
+      activeProject = el.dataset.project;
+      activeConv = null;
+      renderProjects(); renderConvs(); renderMessages();
+    });
+  });
+}
+
+/* ── 渲染会话列表 ── */
+function renderConvs() {
+  const list = CONVERSATIONS[activeProject] || [];
+  document.getElementById("conv-count").textContent = list.length;
+  const el = document.getElementById("conv-list");
+  if (!list.length) { el.innerHTML = `<div class="empty-hint" style="margin-top:20px">暂无会话</div>`; return; }
+  el.innerHTML = list.map(c => `
+    <div class="conv-item ${c.id === activeConv ? 'active' : ''}" data-conv="${c.id}">
+      <div class="conv-title">${c.title}</div>
+      <div class="conv-meta">
+        <span class="conv-hash">${c.id.slice(0,8)}</span>
+        <span class="conv-time">${c.time}</span>
+      </div>
+    </div>
+  `).join('');
+  el.querySelectorAll('.conv-item').forEach(el => {
+    el.addEventListener('click', () => {
+      activeConv = el.dataset.conv;
+      renderConvs(); renderMessages();
+    });
+  });
+}
+
+/* ── 渲染消息区 ── */
+function renderMessages() {
+  document.getElementById("topbar-project").textContent = activeProject || "—";
+  const sep  = document.getElementById("topbar-sep");
+  const conv = document.getElementById("topbar-conv");
+  if (activeConv) { sep.style.display=''; conv.style.display=''; conv.textContent=activeConv; }
+  else { sep.style.display='none'; conv.style.display='none'; }
+
+  const el = document.getElementById("messages");
+  if (!activeConv) { el.innerHTML = `<div class="empty-hint">请从左侧选择一个会话</div>`; return; }
+
+  el.innerHTML = MESSAGES.map(m => `
+    <div class="msg">
+      <div class="msg-dot ${m.role==='user'?'dot-user':'dot-claude'}"></div>
+      <div class="msg-body">
+        <div class="msg-header">
+          <span class="msg-author ${m.role==='user'?'author-user':'author-claude'}">${m.role==='user'?'You':'Claude'}</span>
+          <span class="msg-index">#${m.index}</span>
+        </div>
+        ${m.tool ? `
+          <div class="tool-call">
+            <div class="tool-left">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+              </svg>
+              <span>工具调用</span>
+              <span class="tool-name">${m.toolName}</span>
+            </div>
+            <div class="tool-badge">1</div>
+          </div>
+        ` : `<div class="msg-text ${m.role==='user'?'user-bubble':''}">${m.content}</div>`}
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ── 导航按钮 ── */
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+/* ── 初始化 ── */
+renderProjects(); renderConvs(); renderMessages();
+</script>
+</body>
+</html>
