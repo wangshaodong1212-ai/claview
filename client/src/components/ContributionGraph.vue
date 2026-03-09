@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 
 interface Props {
   data: {
@@ -10,11 +10,14 @@ interface Props {
 
 const props = defineProps<Props>();
 
+// 响应式容器宽度
+const containerWidth = ref(0);
+
 // 周几标签
-const weekDays = ['Mon', 'Wed', 'Fri'];
+const weekDays = ['周一', '周三', '周五'];
 
 // 月份标签
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const months = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
 // 计算颜色等级
 const getColorLevel = (count: number) => {
@@ -24,6 +27,38 @@ const getColorLevel = (count: number) => {
   if (count <= 6) return 3;
   return 4;
 };
+
+// 计算单元格大小（自适应）
+const cellSize = computed(() => {
+  // 根据容器宽度动态计算单元格大小
+  if (containerWidth.value < 500) {
+    return 12; // 小屏幕
+  } else if (containerWidth.value < 700) {
+    return 14; // 中等屏幕
+  } else {
+    return 16; // 大屏幕
+  }
+});
+
+// 计算间隔大小
+const gapSize = computed(() => Math.max(2, Math.floor(cellSize.value / 4)));
+
+// 监听窗口大小变化
+const handleResize = () => {
+  const graphContainer = document.querySelector('.graph-scroll');
+  if (graphContainer) {
+    containerWidth.value = graphContainer.clientWidth;
+  }
+};
+
+onMounted(() => {
+  handleResize();
+  window.addEventListener('resize', handleResize);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
+});
 
 // 格式化数据为 53 周 x 7 天的网格
 const weeks = computed(() => {
@@ -102,18 +137,22 @@ const maxContributions = computed(() => {
       </div>
     </div>
 
-    <div class="graph-container">
+    <div class="graph-container" ref="graphContainer">
       <div class="week-labels">
-        <span v-for="(day, i) in weekDays" :key="i" class="week-label" :style="{ top: `${i * 2 + 1}rem` }">
+        <span v-for="(day, i) in weekDays" :key="i" class="week-label" :style="{ top: `${i * 2.4 * cellSize + 12}px` }">
           {{ day }}
         </span>
       </div>
 
       <div class="graph-scroll">
-        <div class="weeks">
-          <div v-for="(week, w) in weeks" :key="w" class="week">
+        <div class="weeks" :style="{ gap: `${gapSize}px` }">
+          <div v-for="(week, w) in weeks" :key="w" class="week" :style="{ gap: `${gapSize}px` }">
             <div v-for="(day, d) in week" :key="`${w}-${d}`"
               class="day-cell"
+              :style="{
+                width: `${cellSize}px`,
+                height: `${cellSize}px`
+              }"
               :class="'level-' + (day === null ? 0 : getColorLevel(day))"
               :title="day === null ? 'No data' : `${day} contributions`"
             ></div>
@@ -121,7 +160,7 @@ const maxContributions = computed(() => {
         </div>
 
         <div class="month-labels">
-          <span v-for="m in 12" :key="m" class="month-label" :style="{ left: `${m * 3.5}rem` }">
+          <span v-for="(m, i) in 12" :key="m" class="month-label" :style="{ left: `${i * 4.4 * (cellSize + gapSize) + 40}px` }">
             {{ months[m - 1] }}
           </span>
         </div>
@@ -143,6 +182,7 @@ const maxContributions = computed(() => {
   background: var(--bg-secondary);
   border-radius: 12px;
   border: 1px solid var(--border-color);
+  overflow: visible;
 }
 
 .graph-header {
@@ -150,6 +190,8 @@ const maxContributions = computed(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .graph-title {
@@ -209,14 +251,16 @@ const maxContributions = computed(() => {
   position: relative;
   display: flex;
   gap: 8px;
+  min-width: 0;
 }
 
 .week-labels {
   position: absolute;
   left: 0;
-  top: 20px;
-  bottom: 24px;
+  top: 4px;
+  bottom: 32px;
   width: 30px;
+  pointer-events: none;
 }
 
 .week-label {
@@ -228,32 +272,34 @@ const maxContributions = computed(() => {
 
 .graph-scroll {
   flex: 1;
-  overflow-x: auto;
+  /* overflow-x: auto; */
+  /* overflow-y: visible; */
+  min-width: 0;
+  padding: 0 0 40px 0;
 }
 
 .weeks {
   display: flex;
-  gap: 3px;
 }
 
 .week {
   display: flex;
   flex-direction: column;
-  gap: 3px;
 }
 
 .day-cell {
-  width: 12px;
-  height: 12px;
   border-radius: 2px;
   background: var(--border-color);
   transition: all 0.15s ease;
+  flex-shrink: 0;
+  position: relative;
 }
 
 .day-cell:hover {
   transform: scale(1.3);
   outline: 2px solid var(--accent-color);
   outline-offset: 1px;
+  z-index: 10;
 }
 
 .day-cell.level-1 {
@@ -276,6 +322,7 @@ const maxContributions = computed(() => {
   position: relative;
   height: 24px;
   margin-top: 8px;
+  min-width: 100%;
 }
 
 .month-label {

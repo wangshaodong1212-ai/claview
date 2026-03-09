@@ -437,7 +437,8 @@ app.get('/api/stats', (req, res) => {
             .filter(file => file.endsWith('.jsonl') && !file.toLowerCase().includes('settings'));
           const sessionCount = files.length;
           totalSessions += sessionCount;
-          projectStats.push({ projectName, sessionCount, projectPath });
+          // 使用组件期望的字段名：name 和 count
+          projectStats.push({ name: projectName, count: sessionCount, projectPath });
 
           // 统计每个会话文件的修改日期
           for (const file of files) {
@@ -451,6 +452,129 @@ app.get('/api/stats', (req, res) => {
     }
 
     projectStats.sort((a, b) => b.sessionCount - a.sessionCount);
+
+    // 收集最近访问的会话（按修改时间排序）
+    const recentSessions = [];
+    for (const [projectPath, projectInfo] of Object.entries(projects)) {
+      const projectName = path.basename(projectPath) || projectPath;
+      const pathParts = projectPath.split('/').filter(Boolean);
+      const lastPart = pathParts[pathParts.length - 1];
+
+      let matchedDir = projectDirs.find(dir => dir.endsWith(lastPart)) ||
+                       projectDirs.find(dir => dir.includes(lastPart));
+
+      if (matchedDir) {
+        const sessionDir = path.join(projectsBaseDir, matchedDir);
+        if (fs.existsSync(sessionDir)) {
+          const files = fs.readdirSync(sessionDir)
+            .filter(file => file.endsWith('.jsonl') && !file.toLowerCase().includes('settings'))
+            .map(file => {
+              const filePath = path.join(sessionDir, file);
+              const stats = fs.statSync(filePath);
+
+              // 读取会话文件获取消息数量和简介
+              let messageCount = 0;
+              let summary = '';
+
+              try {
+                const fileContent = fs.readFileSync(filePath, 'utf-8');
+                const lines = fileContent.trim().split('\n');
+
+                for (const line of lines) {
+                  try {
+                    const data = JSON.parse(line);
+
+                    // 统计消息数量（用户和助手消息）
+                    if (data.type === 'user' || data.type === 'assistant') {
+                      messageCount++;
+
+                      // 获取第一条用户消息作为简介
+                      if (!summary && data.type === 'user') {
+                        const msg = data.message || data;
+                        const content = msg.content || '';
+
+                        if (typeof content === 'string') {
+                          summary = content.substring(0, 100);
+                        } else if (Array.isArray(content)) {
+                          const textPart = content.find(c => c.type === 'text');
+                          if (textPart && textPart.text) {
+                            summary = textPart.text.substring(0, 100);
+                          }
+                        }
+                      }
+                    } else if (data.message) {
+                      const messageType = data.type;
+                      if (messageType === 'user' || messageType === 'assistant') {
+                        messageCount++;
+
+                        if (!summary && messageType === 'user') {
+                          const content = data.message.content || '';
+                          if (typeof content === 'string') {
+                            summary = content.substring(0, 100);
+                          } else if (Array.isArray(content)) {
+                            const textPart = content.find(c => c.type === 'text');
+                            if (textPart && textPart.text) {
+                              summary = textPart.text.substring(0, 100);
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    continue;
+                  }
+                }
+
+                // 如果没有用户消息，尝试获取助手消息作为简介
+                if (!summary && messageCount > 0) {
+                  for (const line of lines) {
+                    try {
+                      const data = JSON.parse(line);
+                      const msg = data.message || data;
+                      const content = msg.content || '';
+
+                      let textContent = '';
+                      if (typeof content === 'string') {
+                        textContent = content;
+                      } else if (Array.isArray(content)) {
+                        const textPart = content.find(c => c.type === 'text');
+                        if (textPart && textPart.text) {
+                          textContent = textPart.text;
+                        }
+                      }
+
+                      if (textContent) {
+                        summary = textContent.substring(0, 100);
+                        break;
+                      }
+                    } catch (e) {
+                      continue;
+                    }
+                  }
+                }
+              } catch (e) {
+                // 读取失败时使用默认值
+                summary = '';
+              }
+
+              return {
+                sessionId: file.replace('.jsonl', ''),
+                filePath,
+                projectPath,
+                projectName,
+                modifiedAt: stats.mtime,
+                messageCount,
+                summary
+              };
+            });
+
+          recentSessions.push(...files);
+        }
+      }
+    }
+
+    // 按修改时间排序，取最近 10 个
+    recentSessions.sort((a, b) => b.modifiedAt - a.modifiedAt);
 
     // 转换贡献图为数组并按日期排序
     const contributionGraph = Array.from(contributionMap.entries())
@@ -470,7 +594,8 @@ app.get('/api/stats', (req, res) => {
         totalProjects: Object.keys(projects).length,
         totalSessions,
         projectStats: projectStats.slice(0, 10),
-        contributionGraph: filteredContributionGraph
+        contributionGraph: filteredContributionGraph,
+        recentSessions: recentSessions.slice(0, 10)
       }
     });
   } catch (error) {

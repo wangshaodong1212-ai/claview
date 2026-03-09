@@ -5,9 +5,10 @@ interface SessionData {
   sessionId: string;
   projectName: string;
   projectPath: string;
-  sessionPath: string;
-  lastModified: Date;
+  filePath: string;
+  modifiedAt: Date;
   messageCount: number;
+  summary?: string;
 }
 
 interface Props {
@@ -66,12 +67,12 @@ const emit = defineEmits<{
         <div class="session-content">
           <div class="session-project">{{ session.projectName }}</div>
           <div class="session-info">
-            <span class="session-id">{{ session.sessionId.slice(0, 8) }}</span>
+            <span class="session-summary">{{ session.summary || '无简介' }}</span>
             <span class="session-messages">{{ session.messageCount }} 条消息</span>
           </div>
         </div>
         <div class="session-meta">
-          <span class="session-time">{{ formatTime(session.lastModified) }}</span>
+          <span class="session-time">{{ formatTime(session.modifiedAt) }}</span>
         </div>
       </div>
     </div>
@@ -202,13 +203,15 @@ const emit = defineEmits<{
   gap: 8px;
 }
 
-.session-id {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-  background: var(--bg-tertiary);
-  padding: 2px 6px;
-  border-radius: 4px;
+.session-summary {
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }
 
 .session-messages {

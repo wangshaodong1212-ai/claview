@@ -16,7 +16,7 @@ const gridColor = 'rgba(88, 166, 255, 0.1)';
 
 // 处理数据 - 按月分组统计
 const chartData = computed(() => {
-  if (!props.data || !Array.isArray(props.data)) {
+  if (!props.data || !Array.isArray(props.data) || props.data.length === 0) {
     return [];
   }
 
@@ -53,14 +53,28 @@ const formatMonth = (date: string) => {
 
 // 计算点坐标
 const getPointCoords = (index: number, count: number) => {
-  const x = 60 + (index / (chartData.value.length - 1 || 1)) * 520;
-  const y = 200 - (count / maxValue.value) * 150;
+  const paddingX = 60;
+  const availableWidth = 520;
+  const paddingY = 200;
+  const availableHeight = 150;
+
+  // 如果只有一个点，放在中间
+  if (chartData.value.length === 1) {
+    return {
+      x: paddingX + availableWidth / 2,
+      y: paddingY - (count / maxValue.value) * availableHeight
+    };
+  }
+
+  const x = paddingX + (index / (chartData.value.length - 1)) * availableWidth;
+  const y = paddingY - (count / maxValue.value) * availableHeight;
   return { x, y };
 };
 
 // 生成折线路径
 const linePath = computed(() => {
   if (chartData.value.length === 0) return '';
+  if (chartData.value.length === 1) return ''; // 单个点不画折线
 
   const points = chartData.value.map((item, index) => {
     const { x, y } = getPointCoords(index, item.count);
@@ -73,6 +87,7 @@ const linePath = computed(() => {
 // 生成渐变区域路径
 const areaPath = computed(() => {
   if (chartData.value.length === 0) return '';
+  if (chartData.value.length === 1) return ''; // 单个点不画渐变区域
 
   const firstPoint = getPointCoords(0, chartData.value[0]?.count || 0);
   const lastPoint = getPointCoords(chartData.value.length - 1, chartData.value[chartData.value.length - 1]?.count || 0);
@@ -84,6 +99,9 @@ const areaPath = computed(() => {
 
   return `M ${firstPoint.x},200 L ${points.join(' L ')} L ${lastPoint.x},200 Z`;
 });
+
+// 判断是否显示单点模式
+const isSinglePoint = computed(() => chartData.value.length === 1);
 </script>
 
 <template>
@@ -101,7 +119,7 @@ const areaPath = computed(() => {
     </div>
 
     <div v-else class="chart-container">
-      <svg viewBox="0 0 640 280" class="trend-svg">
+      <svg viewBox="0 0 640 280" class="trend-svg" preserveAspectRatio="xMidYMid meet">
         <!-- 定义渐变 -->
         <defs>
           <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -133,12 +151,12 @@ const areaPath = computed(() => {
         </g>
 
         <!-- 渐变区域 -->
-        <path v-if="chartData.length > 1"
+        <path v-if="!isSinglePoint && chartData.length > 1"
               :d="areaPath"
               fill="url(#areaGradient)" />
 
         <!-- 折线 -->
-        <polyline v-if="chartData.length > 1"
+        <polyline v-if="!isSinglePoint && chartData.length > 1"
                   :points="linePath"
                   fill="none"
                   :stroke="accentColor"
@@ -152,14 +170,14 @@ const areaPath = computed(() => {
           <g v-for="(item, index) in chartData" :key="index" class="point-group">
             <circle :cx="getPointCoords(index, item.count).x"
                     :cy="getPointCoords(index, item.count).y"
-                    r="6"
+                    :r="isSinglePoint ? 8 : 6"
                     :fill="accentColor"
                     stroke="var(--bg-secondary)"
                     stroke-width="2"
                     class="data-point" />
             <circle :cx="getPointCoords(index, item.count).x"
                     :cy="getPointCoords(index, item.count).y"
-                    r="10"
+                    :r="10"
                     fill="transparent"
                     class="point-hover" />
           </g>
@@ -193,6 +211,8 @@ const areaPath = computed(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .chart-title {
@@ -232,12 +252,14 @@ const areaPath = computed(() => {
 
 .chart-container {
   width: 100%;
+  min-width: 0;
 }
 
 .trend-svg {
   width: 100%;
   height: auto;
   overflow: visible;
+  min-height: 200px;
 }
 
 .trend-line {
@@ -271,5 +293,16 @@ const areaPath = computed(() => {
 
 .point-group {
   pointer-events: all;
+}
+
+/* 响应式调整 */
+@media (max-width: 640px) {
+  .trend-chart {
+    padding: 16px;
+  }
+
+  .chart-title {
+    font-size: 14px;
+  }
 }
 </style>
